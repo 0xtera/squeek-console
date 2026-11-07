@@ -37,5 +37,5 @@ Live: https://squeek.hexarin.site
 ## Verification
 
 ```
-squeekchain-verify=7573b08c72c177848611ee72eb1736ae0e44d3f590fce81f
+squeekchain-project: 9c965bfc-9bf4-4771-8806-bebb1c0ea7c7
 ```
