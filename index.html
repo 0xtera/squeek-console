@@ -1,10 +1,12 @@
 <!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Squeekchain Aura & Merge Console</title>
+<meta name="squeekchain-project" content="9c965bfc-9bf4-4771-8806-bebb1c0ea7c7">
+<link rel="icon" href="data:,">
+<title>Squeekchain Aura &amp; Merge Console</title>
 <style>
 :root{--bg:#17171b;--fg:#f2f2f4;--m2:#9a9aa4;--acc:#f08a28;--card:#222228;--ok:#35d07f;--warn:#f8a838;--bad:#e85f3f}
 *{box-sizing:border-box;margin:0}
-body{background:var(--bg);color:var(--fg);font:15px/1.5 ui-monospace,SFMono-Regular,Menlo,monospace;padding:24px;max-width:980px;margin:0 auto}
+body{background:var(--bg);color:var(--fg);font:15px/1.5 ui-monospace,SFMono-Regular,Menlo,monospace;padding:24px;max-width:1040px;margin:0 auto}
 h1{font-size:19px;color:var(--acc);margin-bottom:4px}
 .sub{color:var(--m2);font-size:12px;margin-bottom:20px}
 input{background:var(--card);border:1px solid #3a3a44;color:var(--fg);padding:8px 10px;font:inherit;width:100%;max-width:560px;border-radius:6px}
@@ -12,54 +14,72 @@ button{background:var(--acc);color:#1a1a1e;border:0;padding:8px 16px;font:inheri
 .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:14px;margin-top:18px}
 .card{background:var(--card);border-radius:8px;padding:14px;border:1px solid #2e2e36}
 .card h2{font-size:13px;color:var(--m2);text-transform:uppercase;letter-spacing:.08em;margin-bottom:10px}
-.row{display:flex;justify-content:space-between;padding:4px 0;font-size:14px}
-.k{color:var(--m2)}.v{font-weight:700}
+.row{display:flex;justify-content:space-between;gap:10px;padding:4px 0;font-size:14px}
+.k{color:var(--m2)}.v{font-weight:700;text-align:right}
 .ok{color:var(--ok)}.warn{color:var(--warn)}.bad{color:var(--bad)}
-.badge{display:inline-block;padding:1px 8px;border-radius:99px;font-size:11px;font-weight:700;background:#2e2e36;margin:2px}
-.badge.earned{background:#1c4d33;color:var(--ok)}
-.badge.progress{background:#4a3b1c;color:var(--warn)}
 #status{margin-top:16px;font-size:12px;color:var(--m2)}
+a{color:var(--acc)}
 </style></head><body>
-<h1>🐿️ Squeekchain Aura & Merge Console</h1>
-<div class="sub">read-only · core API + community API · nothing is signed or sent on-chain</div>
+<h1>🐿️ Squeekchain Aura &amp; Merge Console</h1>
+<div class="sub">read-only · core API + community API, proxied same-origin · nothing is signed or sent on-chain</div>
 <div><input id="wallet" placeholder="0x…"><button id="go">Load</button></div>
 <div class="grid" id="out"></div><div id="status"></div>
 <script>
-const CORE="https://api.squeekchain.com", COMM="https://community.squeekchain.com/v1/community";
 const $=id=>document.getElementById(id);
-async function j(u,o){const r=await fetch(u,{headers:{Accept:"application/json","User-Agent":"Mozilla/5.0"},...o});return{status:r.status,data:await r.json().catch(()=>null)}}
-function card(h,rows){return `<div class="card"><h2>${h}</h2>${rows.map(([k,v])=>`<div class="row"><span class="k">${k}</span><span class="v">${v}</span></div>`).join("")}</div>`}
+const q=String.raw;
+async function j(u){const r=await fetch(u,{headers:{Accept:"application/json"}});return{status:r.status,data:await r.json().catch(()=>null)}}
+const u18=x=>(BigInt(x||0)/10n**18n).toString();
+const u18f=(x,n=4)=>{const v=BigInt(x||0);const s=(v/10n**18n).toString();
+  if(n<=0)return s;const f=(v%10n**18n).toString().padStart(18,"0").slice(0,n);
+  return `${s}.${f}`;};
+function card(h,rows){return `<div class="card"><h2>${h}</h2>${rows.map(([k,v,c])=>`<div class="row"><span class="k">${k}</span><span class="v ${c||""}">${v}</span></div>`).join("")}</div>`}
 async function load(){
- const w=$("wallet").value.trim(); if(!/^0x[a-fA-F0-9]{40}$/.test(w)){$("status").textContent="enter a 0x address";return}
+ const w=$("wallet").value.trim();
+ if(!/^0x[a-fA-F0-9]{40}$/.test(w)){$("status").textContent="enter a 0x address";return}
  $("status").textContent="loading…"; $("out").innerHTML="";
- const a=await j(`${CORE}/v1/accounts/${w}`);
+ const a=await j(`/api/core/accounts/${w}`);
  if(a.status!==200){$("status").textContent="core API "+a.status;return}
  const d=a.data,e=d.economy||{},p=d.power||{},rw=d.rewards||{},st=d.stake||{};
  let rows="";
- rows+=card("Account",[
-   ["chain",e.chainId||"11155111 sepolia"],["round",e.currentRound],["core height",e.coreBlockHeight],
-   ["merges open",e.mergesOpen?"yes":"no"],["max level",e.maximumLevel]]);
+ rows+=card("Chain",[
+   ["target",e.chainId||d.chain?.target||"sepolia"],
+   ["chain id",d.chain?.chainId||"11155111"],
+   ["indexed through block",d.chain?.indexedThroughBlock||"—"],
+   ["current round",e.currentRound??"—"],
+   ["core height",e.coreBlockHeight??"—"],
+   ["merges open",e.mergesOpen?"yes":"no",e.mergesOpen?"ok":"warn"],
+   ["max level",e.maximumLevel??"—"]]);
  rows+=card("Power",[
-   ["nftPower",(()=>{const x=BigInt(p.nftPower||0);return (x/10n**18n).toString()})()],
-   ["sqkPower",(()=>{const x=BigInt(p.sqkPower||0);return (x/10n**18n).toString()})()]]);
+   ["nftPower",u18(p.nftPower)],
+   ["sqkPower",u18(p.sqkPower)],
+   ["total",u18((BigInt(p.nftPower||0)+BigInt(p.sqkPower||0))),"ok"]]);
  rows+=card("Stake & rewards",[
-   ["principal",(()=>{const x=BigInt(st.principalBaseUnits||0);return (x/10n**18n).toFixed(4)})()+" SQK"],
-   ["fresh",(()=>{const x=BigInt(st.freshBaseUnits||0);return (x/10n**18n).toFixed(4)})()+" SQK"],
-   ["mature",(()=>{const x=BigInt(st.matureBaseUnits||0);return (x/10n**18n).toFixed(4)})()+" SQK"],
-   ["claimable",(()=>{const x=BigInt(rw.claimableBaseUnits||0);return (x/10n**18n).toFixed(6)})()+" SQK"],
-   ["lifetime paid",(()=>{const x=BigInt(rw.lifetimePaidBaseUnits||0);return (x/10n**18n).toFixed(4)})()+" SQK"]]);
- const tk=(d.tokens||[]).map(t=>{
-   const cd=t.mergeState==="cooldown"?`cooldown · next ${t.nextMergeHeight}`:t.mergeState;
-   return `<div class="row"><span class="k">#${t.tokenId} L${t.level} ${t.custody}</span><span class="v ${t.mergeState==="ready"?"ok":"warn"}">${cd}</span></div>`}).join("");
- rows+=card(`Squeeks (${(d.tokens||[]).length})`,tk.length?tk.split("</div>").filter(x=>x).map(x=>x+"</div>"):["—"]);
+   ["principal",u18f(st.principalBaseUnits)+" SQK"],
+   ["fresh",u18f(st.freshBaseUnits)+" SQK"],
+   ["mature",u18f(st.matureBaseUnits)+" SQK"],
+   ["claimable",u18f(rw.claimableBaseUnits,6)+" SQK"],
+   ["lifetime paid",u18f(rw.lifetimePaidBaseUnits)+" SQK"]]);
+ const toks=d.tokens||[];
+ const tk=toks.map(t=>{const cd=t.mergeState==="cooldown"?`cooldown · next ${t.nextMergeHeight}`:t.mergeState;
+   return [`#${t.tokenId} L${t.level} ${t.custody||""}`,cd,t.mergeState==="ready"?"ok":"warn"];});
+ rows+=card(`Squeeks (${toks.length})`, tk.length?tk:[["—",""]]);
  try{
-  const lb=await j(`${COMM}/leaderboard`);
-  const top=(lb.data.entries||[]).slice(0,10).map(x=>
-    `<div class="row"><span class="k">#${x.rank}</span><span class="v">${x.aura} aura · ${x.badges} badges</span></div>`).join("");
-  rows+=card("Leaderboard top 10",top);
- }catch{}
+  const lb=await j("/api/community/leaderboard");
+  const es=(lb.data.entries||[]).slice(0,10);
+  rows+=card("Leaderboard top 10", es.length?es.map(x=>[`#${x.rank} ${x.identity?.username||x.code}`,`${x.aura} aura · ${x.badges} badges`,"ok"]):[["—",""]]);
+ }catch(e){rows+=card("Leaderboard",[["error",String(e).slice(0,60),"bad"]])}
+ try{
+  const col=await j("/api/community/collections");
+  const cs=(col.data.collections||[]).slice(0,8);
+  rows+=card("Top collections by Aura", cs.length?cs.map(c=>[c.title.slice(0,26),`${c.bonus} bonus · ${c.active} active`,"warn"]):[["—",""]]);
+ }catch(e){}
+ try{
+  const st2=await j("/api/community/stats");
+  const s=st2.data||{};
+  rows+=card("Genesis",[["members",(s.members||0).toLocaleString()],["badges earned",(s.badgesEarned||0).toLocaleString()],["projects verified",s.projectsVerified,"ok"],["total aura",(s.totalAura||0).toLocaleString()]]);
+ }catch(e){}
  $("out").innerHTML=rows;
- $("status").textContent=`indexed through block ${d.chain?.indexedThroughBlock||"—"} · ${new Date(d.generatedAt||Date.now()).toLocaleTimeString()}`;
+ $("status").textContent=`core release ${d.release?.id||"?"} · generated ${new Date(d.generatedAt||Date.now()).toLocaleTimeString()}`;
 }
 $("go").onclick=load; $("wallet").addEventListener("keydown",e=>e.key==="Enter"&&load());
 </script></body></html>
