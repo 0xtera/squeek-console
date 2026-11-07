@@ -33,3 +33,9 @@ Then open `http://<host>/`.
 - `https://community.squeekchain.com/v1/community`
 
 Live: https://squeek.hexarin.site
+
+## Verification
+
+```
+squeekchain-verify=7573b08c72c177848611ee72eb1736ae0e44d3f590fce81f
+```
